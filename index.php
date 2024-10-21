@@ -31,16 +31,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Handle adding an order
-    if (isset($_POST['add_order'])) {
-        $order_date = $_POST['order_date'];
-        $customer_id = $_POST['customer_id']; // Ensure you have this value from the form
-        $computer_part_id = $_POST['computer_part_id']; // Ensure you have this value from the form
-        $quantity = $_POST['quantity'];
+if (isset($_POST['add_order'])) {
+    $order_date = $_POST['order_date'];
+    $customer_id = $_POST['customer_id']; // Ensure you have this value from the form
+    $computer_part_id = $_POST['computer_part_id']; // Ensure you have this value from the form
+    $quantity = $_POST['quantity'];
+
+    // Check the stock of the selected computer part
+    $stmt = $pdo->prepare("SELECT stock FROM ComputerParts WHERE id = :computer_part_id");
+    $stmt->execute(['computer_part_id' => $computer_part_id]);
+    $part = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // If the part is found and stock is sufficient, proceed with the order
+    if ($part && $part['stock'] >= $quantity) {
         insertOrder($pdo, $order_date, $customer_id, $computer_part_id, $quantity);
+        // Update stock after successful order (optional)
+        $newStock = $part['stock'] - $quantity;
+        $updateStmt = $pdo->prepare("UPDATE ComputerParts SET stock = :new_stock WHERE id = :computer_part_id");
+        $updateStmt->execute(['new_stock' => $newStock, 'computer_part_id' => $computer_part_id]);
+    } else {
+        // Stock is insufficient or part not found
+        $error_message = "Insufficient stock for the selected part.";
     }
 }
+}
 
-// Handle delete actions
 if (isset($_GET['delete'])) {
     $delete_type = $_GET['type'];
     $id = $_GET['id'];
@@ -56,14 +71,13 @@ if (isset($_GET['delete'])) {
     }
 }
 
+
 // Retrieve data to display
 $suppliers = getAllSuppliers($pdo);
 $computerParts = getAllComputerParts($pdo);
 $customers = getAllCustomers($pdo);
 $orders = getAllOrdersWithDetails($pdo); // Assuming this function is implemented as per your models.php
 
-// Fetch the most recent order details for the receipt
-$latest_order = !empty($orders) ? $orders[count($orders) - 1] : null;
 
 ?>
 
@@ -246,3 +260,5 @@ $latest_order = !empty($orders) ? $orders[count($orders) - 1] : null;
                 <?php endforeach; ?>
             </tbody>
         </table>
+        </body>
+        </html>
